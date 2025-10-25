@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { UserAnswers } from '../types';
 
@@ -23,6 +22,7 @@ const generateTextPrompt = (answers: UserAnswers): string => `
   2.  **Концепция** (1-2 предложения, что это за приложение и какую проблему решает).
   3.  **3-5 Основных функций** (короткий список).
   4.  **ИИ-составляющая** (как именно ИИ будет встроен в приложение для решения задачи).
+  5.  **Полезные API** (3-4 РЕАЛЬНЫХ и ПРОВЕРЕННЫХ бесплатных API, которые помогут реализовать эту идею. Укажи название и краткое описание. Не предлагай фейковые API типа JSONPlaceholder).
   
   Форматируй ответ в markdown:
   
@@ -38,6 +38,11 @@ const generateTextPrompt = (answers: UserAnswers): string => `
   *   [функция 5 (опционально)]
   
   **ИИ-составляющая:** [объяснение использования ИИ]
+
+  **Полезные API:**
+  *   **[Название API 1]:** [краткое описание]
+  *   **[Название API 2]:** [краткое описание]
+  *   **[Название API 3]:** [краткое описание]
 `;
 
 const generateImagePrompt = (ideaText: string): string => {
@@ -64,6 +69,10 @@ export const generateIdea = async (answers: UserAnswers): Promise<{ text: string
         });
         const ideaText = textResponse.text;
 
+        if (!ideaText.trim()) {
+            throw new Error('Не удалось сгенерировать текст идеи. Ответ от AI был пустым, возможно, из-за настроек безопасности.');
+        }
+
         // 2. Generate Image based on Text Idea
         const imagePrompt = generateImagePrompt(ideaText);
         const imageResponse = await ai.models.generateContent({
@@ -76,23 +85,36 @@ export const generateIdea = async (answers: UserAnswers): Promise<{ text: string
             },
         });
 
-        let imageUrl = '';
-        for (const part of imageResponse.candidates[0].content.parts) {
-            if (part.inlineData) {
-                const base64ImageBytes: string = part.inlineData.data;
-                imageUrl = `data:image/png;base64,${base64ImageBytes}`;
-                break;
+        const candidate = imageResponse.candidates?.[0];
+        const imagePart = candidate?.content?.parts?.find(p => p.inlineData);
+
+        if (!imagePart) {
+            console.error("Image generation failed. Response:", JSON.stringify(imageResponse, null, 2));
+            let reason = 'Неизвестная причина.';
+            if (candidate?.finishReason === 'NO_IMAGE') {
+                reason = 'AI не смог создать изображение для этого запроса.';
+            } else if (candidate?.finishReason === 'SAFETY') {
+                reason = 'Запрос был заблокирован фильтрами безопасности.';
+            } else if (!candidate) {
+                reason = 'Ответ от AI был пуст.';
             }
+            throw new Error(`Не удалось сгенерировать изображение. ${reason} Попробуйте сгенерировать новую идею.`);
         }
 
-        if (!imageUrl) {
-            throw new Error('Image generation failed or returned no data.');
-        }
+        const base64ImageBytes: string = imagePart.inlineData!.data;
+        const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
 
         return { text: ideaText, imageUrl };
 
     } catch (error) {
         console.error("Error calling Gemini API:", error);
+         if (error instanceof Error) {
+            // Re-throw more specific errors from the try-block
+            if (error.message.startsWith('Не удалось')) {
+                throw error;
+            }
+        }
+        // Fallback for other errors
         throw new Error("Не удалось сгенерировать идею. Пожалуйста, проверьте ваш API ключ и попробуйте снова.");
     }
 };

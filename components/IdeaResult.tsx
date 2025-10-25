@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { GeneratedIdea } from '../types';
 import { CopyIcon, CheckIcon, RefreshIcon } from './icons';
@@ -10,8 +9,20 @@ interface IdeaResultProps {
 
 const SimpleMarkdownParser: React.FC<{ text: string }> = ({ text }) => {
   const lines = text.split('\n');
-  const elements = [];
-  let listItems: string[] = [];
+  const elements: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+
+  const parseInlineBold = (content: string, key: string) => {
+      const parts = content.split(/(\*\*.*?\*\*)/g);
+      return <span key={key}>{
+          parts.map((part, index) => {
+              if (part.startsWith('**') && part.endsWith('**')) {
+                  return <strong key={index}>{part.slice(2, -2)}</strong>;
+              }
+              return part;
+          })
+      }</span>;
+  }
 
   const flushList = (key: string) => {
     if (listItems.length > 0) {
@@ -34,7 +45,7 @@ const SimpleMarkdownParser: React.FC<{ text: string }> = ({ text }) => {
       const content = line.substring(2, line.length - 2);
       elements.push(<p key={index} className="font-semibold text-lg my-2 text-white">{content}</p>);
     } else if (line.startsWith('* ')) {
-      listItems.push(line.substring(2));
+      listItems.push(parseInlineBold(line.substring(2), `li-content-${index}`));
     } else if (line) {
       flushList(`ul-${index}`);
       elements.push(<p key={index} className="my-1">{line}</p>);
@@ -44,7 +55,6 @@ const SimpleMarkdownParser: React.FC<{ text: string }> = ({ text }) => {
   flushList('ul-end');
   return <div className="prose prose-invert">{elements}</div>;
 };
-
 
 const IdeaResult: React.FC<IdeaResultProps> = ({ idea, onNewIdea }) => {
   const [copied, setCopied] = useState(false);
@@ -67,7 +77,8 @@ const IdeaResult: React.FC<IdeaResultProps> = ({ idea, onNewIdea }) => {
            <p className="text-xs text-center text-gray-400 mt-2">Пример того, как это может выглядеть</p>
         </div>
       </div>
-      <div className="flex justify-center space-x-4 mt-6">
+
+      <div className="flex justify-center space-x-4 mt-8">
         <button onClick={handleCopy} className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200">
           {copied ? <CheckIcon className="w-5 h-5" /> : <CopyIcon className="w-5 h-5" />}
           <span>{copied ? 'Скопировано!' : 'Копировать'}</span>

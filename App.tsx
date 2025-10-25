@@ -6,7 +6,7 @@ import { generateIdea } from './services/geminiService';
 import ChatMessage from './components/ChatMessage';
 import IdeaResult from './components/IdeaResult';
 import TypingIndicator from './components/TypingIndicator';
-import { SendIcon } from './components/icons';
+import { SendIcon, RefreshIcon } from './components/icons';
 
 const questions: Question[] = [
   { id: 'problem', text: "Привет! Я твой AI-помощник по генерации идей. Готов создать что-то крутое? Начнем! Какую проблему или потребность ты хочешь решить?" },
@@ -77,11 +77,23 @@ const App: React.FC = () => {
                 };
                 setChatHistory(prev => [...prev, ideaMessage]);
             } catch (err: any) {
-                setError(err.message || 'Произошла неизвестная ошибка.');
+                const errorMessageText = err.message || 'Произошла неизвестная ошибка.';
+                setError(errorMessageText);
                 const errorMessage: Message = {
                     id: Date.now() + 1,
                     sender: Sender.AI,
-                    content: `Ой, что-то пошло не так: ${err.message}`
+                    content: (
+                        <div>
+                            <p>Ой, что-то пошло не так: <span className="font-semibold">{errorMessageText}</span></p>
+                            <button
+                                onClick={handleNewIdea}
+                                className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 mt-4"
+                            >
+                                <RefreshIcon className="w-5 h-5" />
+                                <span>Начать заново</span>
+                            </button>
+                        </div>
+                    )
                 };
                 setChatHistory(prev => [...prev, errorMessage]);
             } finally {
